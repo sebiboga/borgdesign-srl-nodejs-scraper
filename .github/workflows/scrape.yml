@@ -1,0 +1,33 @@
+name: Scrape jobs
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Scrape jobs
+      run: node index.js
+      env:
+        SOLR_AUTH: ${{ secrets.SOLR_AUTH }}
+
+    - name: Upload jobs.json artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: jobs
+        path: jobs.json

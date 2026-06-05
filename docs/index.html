@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Borg Design - Joburi</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+    h1 { color: #333; text-align: center; }
+    .company-info { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .job { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .job h3 { margin: 0 0 5px 0; color: #2c3e50; }
+    .job .meta { color: #666; font-size: 14px; }
+    .job a { color: #3498db; text-decoration: none; }
+    .job a:hover { text-decoration: underline; }
+    .loading { text-align: center; color: #999; padding: 40px; }
+    .error { color: #e74c3c; text-align: center; padding: 20px; }
+    .count { text-align: center; color: #666; margin-bottom: 20px; }
+    .last-update { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Borg Design</h1>
+  <div class="company-info">
+    <p><strong>Companie:</strong> BORG DESIGN SRL</p>
+    <p><strong>Website:</strong> <a href="https://www.borgdesign.ro">borgdesign.ro</a></p>
+    <p><strong>Cariere:</strong> <a href="https://jobs.borgdesign.ro/">jobs.borgdesign.ro</a></p>
+  </div>
+  <div id="jobs-container">
+    <div class="loading">Se încarcă joburile...</div>
+  </div>
+  <div class="last-update" id="last-update"></div>
+
+  <script>
+    async function fetchJobs() {
+      const container = document.getElementById('jobs-container');
+      const updateEl = document.getElementById('last-update');
+
+      try {
+        const res = await fetch('https://api.peviitor.ro/v1/job/?company=Borg%20Design');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        const jobs = data.jobs || [];
+
+        updateEl.textContent = `Ultima actualizare: ${new Date().toLocaleString('ro-RO')}`;
+
+        if (jobs.length === 0) {
+          container.innerHTML = '<div class="error">Nu s-au găsit joburi disponibile.</div>';
+          return;
+        }
+
+        container.innerHTML = `<div class="count">${jobs.length} joburi disponibile</div>`;
+
+        jobs.forEach(job => {
+          const div = document.createElement('div');
+          div.className = 'job';
+          div.innerHTML = `
+            <h3>${job.title || 'Fără titlu'}</h3>
+            <div class="meta">
+              ${job.location ? '📍 ' + job.location.join(', ') : ''}
+              ${job.country ? '🌍 ' + job.country.join(', ') : ''}
+            </div>
+            ${job.url ? '<a href="' + job.url + '" target="_blank" rel="noopener">Vezi jobul</a>' : ''}
+          `;
+          container.appendChild(div);
+        });
+      } catch (err) {
+        container.innerHTML = `<div class="error">Eroare la încărcarea joburilor: ${err.message}</div>`;
+      }
+    }
+
+    fetchJobs();
+    setInterval(fetchJobs, 30000);
+  </script>
+</body>
+</html>
