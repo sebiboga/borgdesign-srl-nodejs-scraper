@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { extractJobs, mapToJobModel } from "../index.js";
+import { extractJobs, extractEJobs, mapToJobModel } from "../index.js";
 
 const COMPANY_CIF = "14837428";
 const COMPANY_NAME = "BORG DESIGN SRL";
@@ -122,5 +122,78 @@ describe("mapToJobModel", () => {
 
     const results = jobs.map(j => mapToJobModel(j, COMPANY_CIF, COMPANY_NAME));
     expect(results[0].url).not.toBe(results[1].url);
+  });
+});
+
+describe("extractEJobs", () => {
+  function createMockNuxtData(jobs) {
+    const data = [null];
+    const jobEntries = [];
+    let idx = 1;
+
+    for (const job of jobs) {
+      const titleStr = job.title;
+      const slugStr = job.slug;
+      const idNum = job.id;
+
+      const titleIdx = idx++;
+      const slugIdx = idx++;
+      const idIdx = idx++;
+      const cityIdIdx = idx++;
+      const addressIdx = idx++;
+      const locReactiveIdx = idx++;
+      const locArrayIdx = idx++;
+      const jobIdx = idx++;
+
+      data[titleIdx] = titleStr;
+      data[slugIdx] = slugStr;
+      data[idIdx] = idNum;
+      data[cityIdIdx] = job.cityId || 1;
+      data[addressIdx] = job.address || "București, România";
+      data[locReactiveIdx] = ["Reactive", locArrayIdx];
+      data[locArrayIdx] = { cityId: cityIdIdx, address: addressIdx };
+      data[jobIdx] = { id: idIdx, title: titleIdx, slug: slugIdx, locations: locReactiveIdx };
+
+      jobEntries.push(jobIdx);
+    }
+
+    const nuxtHtml = `<script>window.__NUXT_DATA__">${JSON.stringify(data)}</script>`;
+    return nuxtHtml;
+  }
+
+  test("extracts jobs from Nuxt data", () => {
+    const html = createMockNuxtData([
+      { id: 1001, title: "Customer Support Specialist", slug: "customer-support-specialist", address: "București, România" },
+      { id: 1002, title: "Python Developer – Web & AI", slug: "python-developer-web-ai", address: "București, România" }
+    ]);
+
+    const jobs = extractEJobs(html);
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0].title).toBe("Customer Support Specialist");
+    expect(jobs[0].url).toBe("https://www.ejobs.ro/job/customer-support-specialist-1001");
+    expect(jobs[0].department).toBe("eJobs");
+    expect(jobs[1].title).toBe("Python Developer – Web & AI");
+    expect(jobs[1].url).toBe("https://www.ejobs.ro/job/python-developer-web-ai-1002");
+  });
+
+  test("returns empty array when no Nuxt data found", () => {
+    const jobs = extractEJobs("<html><body>no jobs</body></html>");
+    expect(jobs).toEqual([]);
+  });
+
+  test("returns empty array when Nuxt data has no job objects", () => {
+    const html = `<script>window.__NUXT_DATA__">${JSON.stringify([null, "foo", "bar"])}</script>`;
+    const jobs = extractEJobs(html);
+    expect(jobs).toEqual([]);
+  });
+
+  test("handles single job", () => {
+    const html = createMockNuxtData([
+      { id: 2001, title: "Python Developer", slug: "python-developer", address: "București, România" }
+    ]);
+
+    const jobs = extractEJobs(html);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].title).toBe("Python Developer");
   });
 });

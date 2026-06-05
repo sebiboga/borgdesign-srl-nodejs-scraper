@@ -6,6 +6,7 @@ import { querySOLR, upsertJobs, upsertCompany } from "./solr.js";
 
 const COMPANY_CIF = "14837428";
 const CAREERS_URL = "https://jobs.borgdesign.ro/";
+const EJOBS_URL = "https://www.ejobs.ro/company/borg-design/95634";
 const COMPANY_NAME = "BORG DESIGN SRL";
 
 let COMPANY_NAME_UPPER = null;
@@ -49,6 +50,87 @@ async function fetchCareersPage() {
 
   if (!res.ok) {
     throw new Error(`HTTP error ${res.status} for careers page`);
+  }
+
+  return await res.text();
+}
+
+function resolveNuxtRef(val, data) {
+  if (val === null || val === undefined) return val;
+  if (typeof val === "number") {
+    const target = data[val];
+    if (target === null || target === undefined) return val;
+    if (typeof target === "string" || typeof target === "number" || typeof target === "boolean") return target;
+    if (Array.isArray(target)) {
+      if (target.length === 2 && typeof target[1] === "number") {
+        const type = target[0];
+        if (type === "Ref" || type === "Reactive" || type === "ShallowReactive") return resolveNuxtRef(target[1], data);
+        if (type === "EmptyRef") return null;
+      }
+      return target.map(v => resolveNuxtRef(v, data)).filter(v => v !== null);
+    }
+    if (typeof target === "object") {
+      const result = {};
+      for (const [k, v] of Object.entries(target)) result[k] = resolveNuxtRef(v, data);
+      return result;
+    }
+    return target;
+  }
+  if (Array.isArray(val)) {
+    if (val.length === 2 && typeof val[1] === "number") {
+      const type = val[0];
+      if (type === "Ref" || type === "Reactive" || type === "ShallowReactive") return resolveNuxtRef(val[1], data);
+      if (type === "EmptyRef") return null;
+    }
+    return val.map(v => resolveNuxtRef(v, data));
+  }
+  if (typeof val === "object") {
+    const result = {};
+    for (const [k, v] of Object.entries(val)) result[k] = resolveNuxtRef(v, data);
+    return result;
+  }
+  return val;
+}
+
+function extractEJobs(html) {
+  const match = html.match(/__NUXT_DATA__">(.*?)<\/script>/);
+  if (!match) return [];
+
+  const data = JSON.parse(match[1]);
+  const jobs = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    if (typeof d === "object" && !Array.isArray(d) && d !== null && d.title !== undefined) {
+      const resolved = resolveNuxtRef(d, data);
+      if (resolved.id && resolved.title) {
+        const slug = resolved.slug || "";
+        const locations = Array.isArray(resolved.locations)
+          ? resolved.locations.map(l => l.address || "").filter(Boolean)
+          : [];
+
+        jobs.push({
+          title: resolved.title,
+          department: "eJobs",
+          url: slug ? `https://www.ejobs.ro/job/${slug}-${resolved.id}` : ""
+        });
+      }
+    }
+  }
+
+  return jobs;
+}
+
+async function fetchEJobsPage() {
+  const res = await fetch(EJOBS_URL, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+      "Accept": "text/html"
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP error ${res.status} for eJobs page`);
   }
 
   return await res.text();
@@ -101,16 +183,43 @@ async function main() {
       console.log(`Note: Could not upsert company to SOLR core: ${err.message}`);
     }
 
-    console.log("=== Step 3: Scrape jobs from Borg Design ===");
-    const html = await fetchCareersPage();
-    const jobs = extractJobs(html);
-    console.log(`Found ${jobs.length} jobs from Borg Design website`);
-    jobs.forEach((j, i) => console.log(`  ${i + 1}. ${j.title} (${j.department})`));
+    console.log("=== Step 3: Scrape jobs from Borg Design website ===");
+    const borgHtml = await fetchCareersPage();
+    const borgJobs = extractJobs(borgHtml);
+    console.log(`Found ${borgJobs.length} jobs from Borg Design website`);
+    borgJobs.forEach((j, i) => console.log(`  ${i + 1}. ${j.title} (${j.department})`));
 
-    const mappedJobs = jobs.map(job => mapToJobModel(job, localCif, COMPANY_NAME));
+    console.log("\n=== Step 4: Scrape jobs from eJobs ===");
+    let ejobsHtml;
+    let ejobsJobs = [];
+    try {
+      ejobsHtml = await fetchEJobsPage();
+      ejobsJobs = extractEJobs(ejobsHtml);
+    } catch (err) {
+      console.log(`Note: Could not scrape eJobs: ${err.message}`);
+    }
+    console.log(`Found ${ejobsJobs.length} jobs from eJobs`);
+    ejobsJobs.forEach((j, i) => console.log(`  ${i + 1}. ${j.title}`));
+
+    console.log("\n=== Step 5: Merge and deduplicate jobs ===");
+    const seenTitles = new Set();
+    const allJobs = [];
+
+    for (const job of [...borgJobs, ...ejobsJobs]) {
+      const key = job.title.toLowerCase().trim();
+      if (!seenTitles.has(key)) {
+        seenTitles.add(key);
+        allJobs.push(job);
+      }
+    }
+
+    console.log(`Total after dedup: ${allJobs.length} jobs`);
+    allJobs.forEach((j, i) => console.log(`  ${i + 1}. ${j.title} (${j.department})`));
+
+    const mappedJobs = allJobs.map(job => mapToJobModel(job, localCif, COMPANY_NAME));
 
     const payload = {
-      source: "jobs.borgdesign.ro",
+      source: "jobs.borgdesign.ro, ejobs.ro",
       scrapedAt: new Date().toISOString(),
       company: COMPANY_NAME,
       cif: localCif,
@@ -122,13 +231,13 @@ async function main() {
     fs.writeFileSync("jobs.json", JSON.stringify(payload, null, 2), "utf-8");
     console.log("Saved jobs.json");
 
-    console.log("\n=== Step 4: Upsert jobs to SOLR ===");
+    console.log("\n=== Step 6: Upsert jobs to SOLR ===");
     await upsertJobs(payload.jobs);
 
     const finalResult = await querySOLR(COMPANY_CIF);
     console.log(`\n📊 === SUMMARY ===`);
     console.log(`📊 Jobs existing in SOLR before scrape: ${existingCount}`);
-    console.log(`📊 Jobs scraped from Borg Design website: ${jobs.length}`);
+    console.log(`📊 Jobs scraped total: ${allJobs.length} (${borgJobs.length} from website, ${ejobsJobs.length} from eJobs)`);
     console.log(`📊 Jobs in SOLR after scrape: ${finalResult.numFound}`);
     console.log(`====================`);
 
@@ -140,7 +249,7 @@ async function main() {
   }
 }
 
-export { extractJobs, mapToJobModel };
+export { extractJobs, extractEJobs, mapToJobModel };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
