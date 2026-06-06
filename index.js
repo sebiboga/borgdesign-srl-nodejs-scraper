@@ -228,8 +228,8 @@ async function main() {
 
     console.log(`\n📊 Jobs count: ${payload.jobs.length}`);
 
-    fs.writeFileSync("jobs.json", JSON.stringify(payload, null, 2), "utf-8");
-    console.log("Saved jobs.json");
+    fs.writeFileSync("tmp/jobs.json", JSON.stringify(payload, null, 2), "utf-8");
+    console.log("Saved tmp/jobs.json");
 
     console.log("\n=== Step 6: Upsert jobs to SOLR ===");
     await upsertJobs(payload.jobs);
