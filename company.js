@@ -94,6 +94,7 @@ function saveCompanyData(anafData, peviitorData) {
       eFacturaRegistered: anafData?.eFacturaRegistered || false
     }
   };
+  fs.mkdirSync("tmp", { recursive: true });
   fs.writeFileSync("tmp/company.json", JSON.stringify(companyData, null, 2), "utf-8");
   console.log("\n✅ Saved company data to tmp/company.json");
   return companyData;
