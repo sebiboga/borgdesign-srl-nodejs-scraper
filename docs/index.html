@@ -350,7 +350,7 @@
           } else {
             jobsData.response.docs.forEach(job => {
               const li = document.createElement('li');
-              li.innerHTML = `<a href="${job.url}" target="_blank">${job.job_title}</a>`;
+              li.innerHTML = `<a href="${job.url}" target="_blank">${job.title}</a>`;
               jobsList.appendChild(li);
             });
             page++;
