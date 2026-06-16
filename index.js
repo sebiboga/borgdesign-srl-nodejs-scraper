@@ -2,7 +2,7 @@ import fetch from "node-fetch";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { validateAndGetCompany } from "./company.js";
-import { querySOLR, upsertJobs, upsertCompany } from "./solr.js";
+import { querySOLR, upsertJobs, upsertCompany, deleteJobByUrl } from "./solr.js";
 
 const COMPANY_CIF = "14837428";
 const CAREERS_URL = "https://jobs.borgdesign.ro/";
@@ -112,7 +112,7 @@ function extractEJobs(html) {
         jobs.push({
           title: resolved.title,
           department: "eJobs",
-          url: slug ? `https://www.ejobs.ro/job/${slug}-${resolved.id}` : ""
+          url: slug ? `https://www.ejobs.ro/user/locuri-de-munca/${slug}/${resolved.id}` : ""
         });
       }
     }
@@ -232,7 +232,19 @@ async function main() {
     fs.writeFileSync("tmp/jobs.json", JSON.stringify(payload, null, 2), "utf-8");
     console.log("Saved tmp/jobs.json");
 
-    console.log("\n=== Step 6: Upsert jobs to SOLR ===");
+    console.log("\n=== Step 6: Cleanup old eJobs URLs ===");
+    for (const job of existingResult.docs || []) {
+      if (job.url && job.url.startsWith("https://www.ejobs.ro/job/")) {
+        try {
+          await deleteJobByUrl(job.url);
+          console.log(`Deleted old wrong URL: ${job.url}`);
+        } catch (e) {
+          console.log(`Note: Could not delete ${job.url}: ${e.message}`);
+        }
+      }
+    }
+
+    console.log("\n=== Step 7: Upsert jobs to SOLR ===");
     await upsertJobs(payload.jobs);
 
     const finalResult = await querySOLR(COMPANY_CIF);
