@@ -157,6 +157,7 @@ function mapToJobModel(rawJob, cif, companyName) {
 
 async function main() {
   try {
+    fs.mkdirSync("tmp", { recursive: true });
     console.log("=== Step 1: Get existing jobs count ===");
     const existingResult = await querySOLR(COMPANY_CIF);
     const existingCount = existingResult.numFound;

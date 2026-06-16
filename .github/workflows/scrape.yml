@@ -10,24 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
       with:
-        node-version: '20'
+        node-version: '24'
 
     - name: Install dependencies
-      run: npm ci
+      run: npm install
 
     - name: Scrape jobs
-      run: node index.js
+      run: npm run scrape
       env:
         SOLR_AUTH: ${{ secrets.SOLR_AUTH }}
 
+    - name: Check for new jobs
+      run: |
+        if [ -f tmp/jobs.json ]; then
+          echo "New jobs found:"
+          cat tmp/jobs.json | jq '.jobs | length'
+        else
+          echo "No new jobs or scrape failed"
+        fi
+
     - name: Upload jobs.json artifact
-      uses: actions/upload-artifact@v4
+      if: always()
+      uses: actions/upload-artifact@v7
       with:
         name: jobs
-        path: tmp/jobs.json
+        path: |
+          tmp/jobs.json
+          tmp/jobs_existing.json
+        retention-days: 7
