@@ -170,10 +170,10 @@ describe("extractEJobs", () => {
     const jobs = extractEJobs(html);
     expect(jobs).toHaveLength(2);
     expect(jobs[0].title).toBe("Customer Support Specialist");
-    expect(jobs[0].url).toBe("https://www.ejobs.ro/job/customer-support-specialist-1001");
+    expect(jobs[0].url).toBe("https://www.ejobs.ro/user/locuri-de-munca/customer-support-specialist/1001");
     expect(jobs[0].department).toBe("eJobs");
     expect(jobs[1].title).toBe("Python Developer – Web & AI");
-    expect(jobs[1].url).toBe("https://www.ejobs.ro/job/python-developer-web-ai-1002");
+    expect(jobs[1].url).toBe("https://www.ejobs.ro/user/locuri-de-munca/python-developer-web-ai/1002");
   });
 
   test("returns empty array when no Nuxt data found", () => {
