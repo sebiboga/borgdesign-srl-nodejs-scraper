@@ -234,12 +234,13 @@ async function main() {
 
     console.log("\n=== Step 6: Cleanup old eJobs URLs ===");
     for (const job of existingResult.docs || []) {
-      if (job.url && job.url.startsWith("https://www.ejobs.ro/job/")) {
+      const jobUrl = Array.isArray(job.url) ? job.url[0] : job.url;
+      if (jobUrl && typeof jobUrl === "string" && jobUrl.startsWith("https://www.ejobs.ro/job/")) {
         try {
-          await deleteJobByUrl(job.url);
-          console.log(`Deleted old wrong URL: ${job.url}`);
+          await deleteJobByUrl(jobUrl);
+          console.log(`Deleted old wrong URL: ${jobUrl}`);
         } catch (e) {
-          console.log(`Note: Could not delete ${job.url}: ${e.message}`);
+          console.log(`Note: Could not delete ${jobUrl}: ${e.message}`);
         }
       }
     }
